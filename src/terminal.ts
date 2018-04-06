@@ -1,4 +1,5 @@
 'use strict';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import toSpecPath from './utils/toSpecPath';
 
@@ -15,9 +16,12 @@ vscode.window.onDidCloseTerminal((terminal: vscode.Terminal) => {
 
 export function runSpecFile(options: {path?: string; lineNumber?: number; commandText?: string}){
     let editor: vscode.TextEditor = vscode.window.activeTextEditor,
-        path = vscode.workspace.asRelativePath(options.path || editor.document.fileName, false),
-        pattern = getTestFilePattern(),
-        fileName = toSpecPath(path, pattern);
+        absolutePath = options.path || editor.document.fileName,
+        relativePath = vscode.workspace.asRelativePath(absolutePath, false),
+        workspacePath = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(absolutePath)).uri.fsPath,
+        pattern = getTestFilePattern();
+
+    let [baseDir, fileName] = toSpecPath(workspacePath, relativePath, pattern);
 
     if (!editor || !isSpecDirectory(fileName, pattern) && !isSpec(fileName, pattern) && !options.commandText) {
         return;
@@ -41,10 +45,10 @@ export function runSpecFile(options: {path?: string; lineNumber?: number; comman
         }
 
         setTimeout(() => {
-            executeInTerminal(fileName, options);
+            executeInTerminal(baseDir, fileName, options);
         }, interval);
     } else {
-        executeInTerminal(fileName, options);
+        executeInTerminal(baseDir, fileName, options);
     }
 }
 
@@ -54,7 +58,7 @@ export function runLastSpec() {
     }
 }
 
-function executeInTerminal(fileName, options) {
+function executeInTerminal(baseDir, fileName, options) {
     let specTerminal: vscode.Terminal = activeTerminals[SPEC_TERMINAL_NAME];
 
     if (!specTerminal) {
@@ -68,8 +72,13 @@ function executeInTerminal(fileName, options) {
 
     specTerminal.show(shouldFreserveFocus());
 
+    if (getConfig('specCwd')) {
+        specTerminal.sendText(`cd ${baseDir}`);
+        fileName = fileName.replace(baseDir + path.sep, '');
+    }
+
     let lineNumberText = options.lineNumber ? `:${options.lineNumber}` : '',
-        commandText = options.commandText || `${getSpecCommand()} ${fileName}${lineNumberText}`;
+        commandText = options.commandText || `SIMPLECOV=true ${getSpecCommand()} ${fileName}${lineNumberText}`;
 
     specTerminal.sendText(commandText);
 
@@ -84,6 +93,10 @@ function getSpecCommand() {
     } else {
         return 'bundle exec rspec';
     }
+}
+
+function getConfig(configName) {
+    return vscode.workspace.getConfiguration("ruby").get(configName);
 }
 
 function shouldFreserveFocus() {

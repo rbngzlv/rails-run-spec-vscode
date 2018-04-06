@@ -109,6 +109,11 @@
                     "description": "Zeus gem needs a certain time to start. Defined in ms",
                     "default": 2000
                 },
+                "ruby.specCwd": {
+                    "type": "boolean",
+                    "description": "Auto cd to the directory containing the specs folder",
+                    "default": true
+                },
                 "ruby.specSaveFile": {
                     "type": "boolean",
                     "description": "Auto Save file before running spec test",
